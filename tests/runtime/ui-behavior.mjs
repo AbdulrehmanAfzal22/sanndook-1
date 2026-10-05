@@ -1,0 +1,93 @@
+import {mkdirSync,readFileSync} from 'node:fs';
+mkdirSync('.qa',{recursive:true});
+import {JSDOM,VirtualConsole} from 'jsdom';
+import {createRequire} from 'node:module';
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+const virtualConsole=new VirtualConsole();let navigationAttempts=0;
+virtualConsole.on('jsdomError',error=>{if(error.message==='Not implemented: navigation (except hash changes)')navigationAttempts++;else throw error;});
+const dom=new JSDOM('<!doctype html><html><head></head><body><div id="root"></div></body></html>',{url:'http://qa.local/',pretendToBeVisual:true,virtualConsole});
+for(const key of ['window','document','localStorage','location','HTMLElement','Element','Node','Event','MouseEvent','CustomEvent'])globalThis[key]=dom.window[key];
+Object.defineProperty(globalThis,'navigator',{value:dom.window.navigator,configurable:true});
+globalThis.requestAnimationFrame=dom.window.requestAnimationFrame.bind(dom.window);globalThis.cancelAnimationFrame=dom.window.cancelAnimationFrame.bind(dom.window);globalThis.getComputedStyle=dom.window.getComputedStyle.bind(dom.window);globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const stylesheet=document.createElement('style');stylesheet.textContent=['base','shoe','shoe-upgrade','shoe-demo','shoe-landing','shoe-campaign','shoe-instagram'].map(name=>readFileSync(`src/styles/${name}.css`,'utf8')).join('\n');document.head.append(stylesheet);
+window.matchMedia=()=>({matches:false,addListener(){},removeListener(){},addEventListener(){},removeEventListener(){}});window.scrollTo=()=>{};
+const requests=[];let showInstagram=false;
+globalThis.fetch=async(input,init)=>{
+ const url=new URL(typeof input==='string'?input:input.url),body=JSON.parse(init.body),headers=new Headers(init.headers);
+ assert.equal(url.hostname,'ipqcxqsjzkbtxpljvdcy.supabase.co');assert.equal(url.pathname,'/functions/v1/instagram-feed');assert.ok(['feed','more'].includes(body.action));
+ assert.equal(headers.get('Authorization'),'Bearer '+headers.get('apikey'),'The public feed never forwards a customer session');requests.push({url,body});
+ const response=showInstagram?{success:true,connected:true,configured:true,items:[{id:'demo-public-post',media_type:'IMAGE',media_url:'https://cdn.example.invalid/demo-post.jpg',permalink:'https://www.instagram.com/p/demo-public-post/',username:'store.qa',caption:'Public Instagram, alongside the demo catalog',like_count:9}],settings:{username:'store.qa',profile_url:'https://www.instagram.com/store.qa/',desktop_cards:5,mobile_cards:1.2},next_offset:null}:{success:true,connected:false,configured:false,items:[],settings:{is_enabled:false},next_offset:null};
+ return new Response(JSON.stringify(response),{headers:{'Content-Type':'application/json'}});
+};
+await build({entryPoints:['tests/runtime/ui-entry.jsx'],bundle:true,platform:'node',format:'cjs',outfile:'.qa/ui-bundle.cjs',external:['react','react-dom','react-dom/client','react-router-dom'],loader:{'.css':'empty'},define:{'import.meta.env':'{}'},jsx:'automatic'});
+const require=createRequire(import.meta.url),React=require('react'),{act}=React,{createRoot}=require('react-dom/client'),{TestApp}=require('../../.qa/ui-bundle.cjs');
+const root=createRoot(document.getElementById('root'));let passed=0;
+async function render(path){await act(async()=>{root.render(React.createElement(TestApp,{path,key:path}));await new Promise(r=>setTimeout(r,0));});await act(async()=>{await new Promise(r=>setTimeout(r,0));});}
+async function click(el){assert.ok(el,'Target exists');await act(async()=>{el.dispatchEvent(new MouseEvent('click',{bubbles:true}));await Promise.resolve();});}
+function ok(label,check){assert.ok(check,label);passed++;console.log('PASS',label);}
+await render('/');ok('Homepage renders 20 distinct shoe cards',document.querySelectorAll('.sf-card').length===20);ok('Default deployment explicitly labels the demo catalog',document.querySelector('.sf-catalog-bar').textContent.includes('60 original pairs'));ok('Homepage photos show twenty different cells',new Set([...document.querySelectorAll('.sf-card .sf-demo-photo')].map(x=>x.dataset.photoKey)).size===20);ok('Live store switch is a full reload link',document.querySelector('.sf-catalog-bar a:nth-child(2)').getAttribute('href').includes('catalog=live'));ok('Campaign shows original footwear and links to all three departments',document.querySelector('.sf-campaign-photo')?.alt.includes('sneakers')&&['men','women','kids'].every(department=>document.querySelector('.sf-campaign-departments a[href="/shop?department='+department+'"]')));
+ok('Preloved edit is directly above the footer and keeps the condition filter',document.querySelector('.sf-home').lastElementChild===document.querySelector('.sf-reloved')&&document.querySelector('main').nextElementSibling.matches('.sf-footer')&&document.querySelector('.sf-reloved a[href="/shop?condition=preloved"]')&&document.querySelector('.sf-reloved a[href="/condition-guide"]'));
+ok('Homepage has a selectable brand edit and a clearly unconnected Instagram section',document.querySelectorAll('.sf-home-brands .sf-brand-tile').length===12&&document.querySelector('.sf-reels-waiting').textContent.includes('once the store connects its account'));
+ok('Instagram sits in the middle immediately after Fresh Finds and before brands',document.querySelector('#fresh-finds').nextElementSibling===document.querySelector('#instagram')&&document.querySelector('#instagram').nextElementSibling.matches('.sf-home-brands')&&document.querySelectorAll('#instagram').length===1);
+ok('Five decorative coming-soon cards have no invented account or engagement numbers',document.querySelectorAll('.sf-reel-preview').length===5&&!document.querySelector('.sf-reel-preview .sf-reel-stats')&&!document.querySelector('.sf-reel-preview .sf-reel-author'));
+// Emulate scroll geometry, not browser rendering, to exercise the actual rail
+// controls and their boundaries. jsdom cannot calculate visual widths.
+const rail=document.querySelector('.sf-product-track'),scrollCalls=[];
+Object.defineProperties(rail,{clientWidth:{value:1060,configurable:true},scrollWidth:{value:5380,configurable:true}});
+rail.style.columnGap='20px';
+for(const card of rail.children)card.getBoundingClientRect=()=>({width:250});
+rail.scrollTo=options=>{scrollCalls.push(options);rail.scrollLeft=options.left;rail.dispatchEvent(new Event('scroll'));};
+await act(async()=>window.dispatchEvent(new Event('resize')));
+ok('Product browsing starts with Previous disabled and Next available',document.querySelector('[aria-label="Previous shoe pairs"]').disabled&&!document.querySelector('[aria-label="Next shoe pairs"]').disabled);
+await click(document.querySelector('[aria-label="Next shoe pairs"]'));
+ok('Next reveals the following four pairs without changing the collection',rail.scrollLeft===1080&&document.querySelector('.sf-rail-position').textContent.includes('05—08')&&rail.children.length===20);
+await click(document.querySelector('[aria-label="Previous shoe pairs"]'));
+ok('Previous returns to the first pair and disables its boundary control',rail.scrollLeft===0&&document.querySelector('[aria-label="Previous shoe pairs"]').disabled);
+async function key(element,value){await act(async()=>element.dispatchEvent(new window.KeyboardEvent('keydown',{key:value,bubbles:true,cancelable:true})));}
+await key(rail,'End');
+ok('End reaches the final shoes and disables Next',rail.scrollLeft===4320&&document.querySelector('[aria-label="Next shoe pairs"]').disabled&&document.querySelector('.sf-rail-position').textContent.includes('17—20'));
+await key(rail,'Home');await key(rail,'ArrowRight');
+ok('The shoe rail supports Home and arrow-key browsing',rail.scrollLeft===1080);
+const normalMotion=window.matchMedia;window.matchMedia=()=>({matches:true});
+await key(rail,'Home');
+ok('Reduced-motion browsing skips smooth scrolling',scrollCalls.at(-1).behavior==='instant');
+window.matchMedia=normalMotion;
+await key(document.getElementById('fresh-tab-all'),'End');
+ok('Keyboard tabs move focus and reset the rail for twenty Kids pairs',document.activeElement.id==='fresh-tab-kids'&&document.getElementById('fresh-tab-kids').getAttribute('aria-selected')==='true'&&document.querySelector('.sf-product-track').scrollLeft===0&&document.querySelectorAll('.sf-card').length===20);
+await key(document.getElementById('fresh-tab-kids'),'Home');
+ok('Home restores the first department tab and its linked panel',document.activeElement.id==='fresh-tab-all'&&document.querySelector('[role="tabpanel"]').getAttribute('aria-labelledby')==='fresh-tab-all');
+for(const department of ['Men','Women']){await click([...document.querySelectorAll('[role="tab"]')].find(x=>x.textContent===department));ok(department+' tab has twenty unique pairs',document.querySelectorAll('.sf-card').length===20&&new Set([...document.querySelectorAll('.sf-card .sf-demo-photo')].map(x=>x.dataset.photoKey)).size===20);}
+await click([...document.querySelectorAll('[role="tab"]')].find(x=>x.textContent==='Kids'));ok('Kids tab excludes adult unisex pairs',document.querySelectorAll('.sf-card').length===20);
+await render('/shop?department=women&catalog=demo');ok('Women shop contains twenty unique pairs with no catalog-mode filter chip',document.querySelectorAll('.sf-card').length===20&&!document.querySelector('.sf-filter-chips').textContent.includes('catalog:'));
+await render('/shop?size=42&stock=1');ok('Size and availability filters render matching pairs',document.querySelectorAll('.sf-card').length>0);ok('Selected size appears in active filter chip',document.querySelector('.sf-filter-chips').textContent.includes('42'));
+await render('/shop?q=no-such-pair');ok('Search gives a usable empty state',document.querySelector('.sf-empty').textContent.includes('No pairs found'));
+await render('/brands?department=men');ok('Brand directory shows all eighteen categories',document.querySelectorAll('.sf-brand-tile').length===18);
+for(const name of ['Nike','Gucci','Adidas','Puma'])await click(document.querySelector(`[aria-label="Select ${name}"]`));
+ok('Four brands stay selected at the same time',document.querySelectorAll('.sf-brand-tile[aria-pressed="true"]').length===4);
+const selectedLink=document.querySelector('.sf-brand-selection .sf-button');ok('Selected brand link carries four brand filters to Shop',new URL(selectedLink.href).searchParams.getAll('brand').length===4);
+await click(document.querySelector('.sf-department-switch button:nth-child(2)'));ok('Women department retains the selected brands',new URL(document.querySelector('.sf-brand-selection .sf-button').href).searchParams.get('department')==='women'&&document.querySelectorAll('.sf-brand-tile[aria-pressed="true"]').length===4);
+await click(document.querySelector('.sf-department-switch button:nth-child(3)'));ok('Kids has its own selectable brand categories',new URL(document.querySelector('.sf-brand-selection .sf-button').href).searchParams.get('department')==='kids'&&document.querySelectorAll('.sf-brand-tile').length===18);
+await render('/shop?department=men&brand=Nike&brand=Gucci&brand=Adidas&brand=Puma&size=43');
+ok('Brand checkbox and name align in a compact horizontal row',getComputedStyle(document.querySelector('.sf-brand-filter label')).flexDirection==='row'&&getComputedStyle(document.querySelector('.sf-brand-filter input')).width==='16px');ok('Shop renders all four selected brand pills',document.querySelectorAll('.sf-shop-brand-pills [aria-pressed="true"]').length===4);
+await click(document.querySelector('[aria-label="Remove brand filter Gucci"]'));ok('Removing one brand preserves the other brands and the size filter',document.querySelectorAll('.sf-shop-brand-pills [aria-pressed="true"]').length===3&&document.querySelector('.sf-filter-chips').textContent.includes('43'));
+await render('/product/10000000-0000-4000-8000-000000000001');ok('Product gallery crops one demo design',document.querySelector('.product-gallery-main .sf-demo-photo').dataset.photoKey.endsWith(':0:0'));ok('Product prices explicitly use PKR',document.querySelector('.sf-detail-price').textContent.startsWith('PKR '));ok('Related collection shows twenty more distinct pairs',document.querySelectorAll('.sf-related .sf-card').length===20);ok('Add to bag disabled before choosing size',document.querySelector('.sf-purchase>.sf-button').disabled);ok('Sold out size cannot be selected',document.querySelector('.sf-detail-sizes button').disabled);await click(document.querySelector('.sf-detail-sizes button:not(:disabled)'));await click(document.querySelector('.sf-purchase>.sf-button'));ok('Preview bag never creates a live bag',localStorage.getItem('soleform-bag-v1')===null);ok('Chosen size persists in the guest bag',JSON.parse(localStorage.getItem('soleform-preview-bag-v1')).length===1);await click(document.querySelector('.sf-detail-heart'));ok('Saved pair persists locally',JSON.parse(localStorage.getItem('soleform-preview-saved-v1')).length===1);
+await render('/saved');ok('Saved pair renders in favourites',document.querySelectorAll('.sf-card').length===1);
+await render('/cart');ok('Bag retains the same selected shoe photo',document.querySelector('.sf-bag-item .sf-demo-photo').dataset.photoKey.endsWith(':0:0'));ok('Guest cart shows the chosen shoe',document.querySelector('.sf-bag-item h2').textContent==='Orbit 01');ok('Preview checkout is visibly disabled',document.querySelector('.sf-bag-summary>.sf-button').disabled);await click(document.querySelector('[aria-label="Increase Orbit 01 quantity"]'));ok('Guest quantity can be updated',document.querySelector('.sf-bag-item output').textContent==='2');
+await render('/admin?catalog=demo');ok('Admin preview shows sample listings',document.querySelectorAll('.sf-admin-card tbody tr').length===20);ok('Admin preview is explicitly read only',document.querySelector('.sf-admin-top').textContent.includes('READ ONLY'));
+await render('/admin/inventory?catalog=demo');ok('Admin inventory lists individual size variants',document.querySelectorAll('.sf-admin-card tbody tr').length>100);
+await render('/login?catalog=demo');ok('Login explains launch state without network calls',document.querySelector('.auth-preview').textContent.includes('Accounts and orders are not open'));ok('Preview signup/signin action is disabled',document.querySelector('.auth-submit').disabled);
+await render('/size-guide');ok('Size guide includes official brand chart links',document.querySelectorAll('.sf-guide-brands a').length===4);
+await render('/collections');ok('Collections use shoe images and category links',document.querySelectorAll('.sf-collection-tile').length===5);await render('/collections/sneakers');ok('Category pages use the shoe-card layout',document.querySelectorAll('.sf-card').length>0);await render('/admin/settings?catalog=demo');ok('Delivery preview shows prepared values and cannot save',document.querySelector('.sf-preview-settings').textContent.includes('12,000')&&document.querySelector('.sf-admin-card button').disabled);
+await render('/condition-guide');ok('Condition guide shows all 5 grades',document.querySelectorAll('.sf-condition-list>div').length===5);ok('Demo commerce stays offline while only the public Instagram feed is requested',requests.length>0&&requests.every(request=>request.url.pathname==='/functions/v1/instagram-feed'));
+ok('The public footer has no admin access link',![...document.querySelectorAll('.sf-footer a')].some(link=>new URL(link.href).pathname.startsWith('/admin'))&&!document.querySelector('.sf-footer').textContent.includes('Admin portal'));
+await render('/admin/products?group=collections#new');ok('Client-side admin navigation crosses from demo into a live client',document.querySelector('a.button')?.getAttribute('href')==='/admin/products?group=collections&catalog=live#new'&&!document.querySelector('.sf-admin-preview'));
+await render('/account');ok('Account navigation also opens live authentication after demo browsing',document.querySelector('a.button')?.getAttribute('href')==='/account?catalog=live');
+ok('Both private routes attempt the required browser reload',navigationAttempts===2);
+showInstagram=true;await render('/?qa=public-instagram');
+ok('Default demo shoes can display real public Instagram media without opening live accounts',document.querySelectorAll('.sf-card').length===20&&document.querySelectorAll('.sf-reel-card').length===1&&document.querySelector('.sf-reel-author strong').textContent==='@store.qa'&&document.querySelector('.sf-reel-open').href==='https://www.instagram.com/p/demo-public-post/'&&!localStorage.getItem('soleform-auth'));
+await build({entryPoints:['tests/runtime/ui-entry.jsx'],bundle:true,platform:'node',format:'cjs',outfile:'.qa/ui-offline.cjs',external:['react','react-dom','react-dom/client','react-router-dom'],loader:{'.css':'empty'},define:{'import.meta.env':JSON.stringify({VITE_STORE_PREVIEW:'true'})},jsx:'automatic'});
+const OfflineApp=require('../../.qa/ui-offline.cjs').TestApp,beforeOffline=requests.length;
+await act(async()=>{root.render(React.createElement(OfflineApp,{path:'/',key:'offline'}));await new Promise(resolve=>setTimeout(resolve,5));});await act(async()=>{await new Promise(resolve=>setTimeout(resolve,5));});
+ok('Explicit forced offline preview makes no public-feed, database or Auth requests',requests.length===beforeOffline&&document.querySelectorAll('.sf-card').length===20&&document.querySelector('.sf-reels-waiting'));
+await act(async()=>root.unmount());console.log('COMPONENT CHECKS PASSED:',passed);

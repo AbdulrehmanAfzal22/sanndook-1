@@ -1,0 +1,13 @@
+# SOLEFORM handoff — 5 October 2026
+
+- Existing site: `appgprj_6ac2525ed44c81918de66fb730f0ba0e`, https://soleform-shoe-store.drsagheer381.chatgpt.site. Owner-private audience preserved.
+- Supabase target: `shoe` / `ipqcxqsjzkbtxpljvdcy`, in the newly attached account, Free plan, `ap-south-1`. All 31 migrations are deployed. Other projects were not modified.
+- The existing selected owner is verified and has server-controlled administrator membership. Use the existing account at `/admin?catalog=live`; there is no default password.
+- Account and admin colours now match the cream/sage/lime storefront; conflicting dark palette rules were removed. The public footer admin link is removed, the mobile admin entry is role-protected, and sign-in redirects use the server membership result.
+- Both requested emails are verified. `abdulrehmaan.afzal@gmail.com` remains the administrator. The grant for `abdulrehmanafzal60@gmail.com` was blocked by automatic approval review and was not applied; approval for that additional role is still needed.
+- Full account/admin/customer/commerce/support workflows remain. The prior 41 hosted Auth/REST/RPC/Storage checks passed and temporary fixtures were cleaned; details are in `docs/ADMIN_VERIFICATION.json`.
+- The live database has no products or orders yet, seven categories and eighteen editable brands. The preview retains sixty original shoe concepts, twenty per department, with PKR prices. Demo merchandise, carts and checkout stay separate from live inventory.
+- Instagram is in the middle of the homepage after Fresh Finds. The user's reference informs five portrait cards, overlaid account/caption, actual engagement fields, direct links, browsing and explicit video controls. Empty accounts show labelled decorative upcoming stories.
+- `instagram-feed` is ACTIVE, version 4. Add your own `INSTAGRAM_ACCESS_TOKEN` in **shoe → Edge Functions → Secrets**. A valid token automatically discovers your profile and enables the public feed in demo and live catalog views. Optional `INSTAGRAM_FEED_ENABLED=false` hides it. Tokens never enter the public bundle or responses. Local server template: `supabase/functions/.env.example`.
+- New relevant checks passed: 62 demo UI, 24 connected UI, 9 management UI and 17 actual-handler checks with mocked Instagram services. The hosted public feed returns HTTP 200 unconnected, and anonymous admin status is denied HTTP 401.
+- Actual Instagram authorization/media sync requires your own eligible account/token and has not been verified. Browser layout/playback, confirmation/recovery delivery and Auth redirect configuration still need their documented checks. See `docs/INSTAGRAM_FEED_SETUP.md`, `docs/TEST_RESULTS.md` and `docs/SHOE_BACKEND.md`.

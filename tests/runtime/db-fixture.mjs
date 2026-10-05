@@ -1,0 +1,23 @@
+import {PGlite} from '@electric-sql/pglite';
+import {fileURLToPath} from 'node:url';
+import {readFileSync,readdirSync} from 'node:fs';
+const root=fileURLToPath(new URL('../..',import.meta.url));
+export const db=new PGlite();
+await db.exec(`CREATE ROLE anon NOLOGIN;CREATE ROLE authenticated NOLOGIN;CREATE ROLE service_role NOLOGIN BYPASSRLS;
+CREATE SCHEMA auth;CREATE SCHEMA storage;
+CREATE TABLE auth.users(id uuid PRIMARY KEY,email text,email_confirmed_at timestamptz,raw_user_meta_data jsonb DEFAULT '{}',raw_app_meta_data jsonb DEFAULT '{}',created_at timestamptz DEFAULT now());
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb $$;
+GRANT USAGE ON SCHEMA auth,storage TO anon,authenticated;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA auth TO anon,authenticated;
+CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean DEFAULT false,file_size_limit bigint,allowed_mime_types text[]);
+CREATE TABLE storage.objects(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),bucket_id text REFERENCES storage.buckets(id),name text,owner uuid,owner_id text,metadata jsonb DEFAULT '{}',created_at timestamptz DEFAULT now(),UNIQUE(bucket_id,name));
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+GRANT SELECT,INSERT,UPDATE,DELETE ON storage.objects TO authenticated;
+CREATE FUNCTION storage.foldername(name text) RETURNS text[] LANGUAGE sql AS $$SELECT string_to_array(name,'/')$$;
+`);
+export const migrations=readdirSync(root+'/supabase/migrations').filter(f=>f.endsWith('.sql')).sort();
+for(const file of migrations){try{await db.exec(readFileSync(root+'/supabase/migrations/'+file,'utf8'));console.log('APPLIED',file);}catch(e){console.error('MIGRATION FAILED',file,e.message,e.code);process.exit(1);}}
+const result=await db.query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND NOT rowsecurity");
+if(result.rows.length)throw new Error('Exposed tables without RLS: '+JSON.stringify(result.rows));
+console.log('ALL MIGRATIONS APPLIED; ALL PUBLIC TABLES HAVE RLS');

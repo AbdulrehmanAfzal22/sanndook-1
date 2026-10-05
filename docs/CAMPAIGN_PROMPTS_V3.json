@@ -1,0 +1,19 @@
+{
+  "mode": "built-in image_gen.imagegen",
+  "intent": "new original full-width hero and preloved campaign photographs",
+  "transparent_background": false,
+  "assets": [
+    {
+      "role": "hero",
+      "original": "/workspace/sites/shoe/public/images/campaign/every-step-v3.png",
+      "browser": "/workspace/sites/shoe/public/images/campaign/every-step-v3.webp",
+      "prompt": "Use case: ads-marketing. Asset type: original full-width footwear campaign photograph for SOLEFORM's cream, sage and lime ecommerce homepage. Create one photorealistic luxury editorial photograph in a wide landscape 16:9 composition. Scene: a serene pale sage tennis court beside cream modern architecture in warm afternoon sunlight. Subject: very close, low-angle view of the lower legs of an adult wearing relaxed stone-coloured trousers, ribbed ivory socks and an ORIGINAL UNBRANDED pair of elegant ivory suede and mesh sneakers with restrained olive and acid-lime details, tactile mesh, realistic beautiful laces, a cream sculpted outsole with a subtle gum tread. One foot is planted forward with the entire shoe sharply visible and dominates the RIGHT HALF; the second shoe slightly behind, both real and anatomically convincing, walking confidently toward camera. Shoes are large, glamorous, beautifully lit and recognizably footwear, not distant tiny shoes. Composition: keep all legs and shoes within the RIGHTMOST 55 percent, with the front shoe spanning approximately x55 to x94 percent and at y55 to y84 percent. The LEFTMOST 43 percent must be quiet pale warm cream/sage architectural negative space, completely free of legs, props, objects and distracting court lines, suitable for dark large HTML text over it. Lower and upper edges have generous quiet room for responsive cropping. Natural directional sunshine, soft elongated olive shadows cast toward the right, subtle analog grain, premium genuine material texture, grounded realism, fresh optimistic mood. No dark or black background, no deep dark shadows on the left. No floating shoe, no collage, no typography, no logos, no brand stripes or swoosh, no watermark, no UI. This is a new original concept campaign, not a replica of a brand advertisement."
+    },
+    {
+      "role": "preloved",
+      "original": "/workspace/sites/shoe/public/images/campaign/fresh-chapters-v3.png",
+      "browser": "/workspace/sites/shoe/public/images/campaign/fresh-chapters-v3.webp",
+      "prompt": "Use case: product-mockup. Asset type: original footwear still-life photograph for SOLEFORM's preloved edit, in a soft sage and warm cream retail website. Create a photorealistic luxury editorial product photograph, landscape 3:2 composition. Two DISTINCT original unbranded retro sneakers arranged naturally on a low pale sage stone plinth: foreground a gorgeous warm taupe suede low-top with textured cream mesh, ivory laces, muted moss-green heel accent and a gum sole, placed in three-quarter profile pointing left; behind it a different ivory leather court sneaker with a rich muted olive heel tab, seen partially but elegantly, leaning gently on its side. Show tactile softly worn-in suede and supple leather without dirt or damage, suggesting character and a second chapter, but this is clearly original concept imagery. Shoes large and entirely visible, centered within the inner 80 percent of the frame so cropping is safe. Backdrop seamless pale sage wall and warm cream studio floor with soft directional afternoon light and delicate natural olive shadows. Simple, beautifully styled, convincing shoe shapes and construction, quiet gallery aesthetic, fine analog grain. No feet, no people, no orange or black backgrounds, no typography, no logo, no swoosh, no brand stripes, no watermarks, no flowers, no collage, no UI."
+    }
+  ]
+}

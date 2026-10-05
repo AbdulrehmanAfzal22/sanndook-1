@@ -1,0 +1,19 @@
+project_id = "shoe"
+
+[api]
+enabled = true
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+
+[auth]
+enabled = true
+site_url = "https://soleform-shoe-store.drsagheer381.chatgpt.site"
+additional_redirect_urls = ["https://soleform-shoe-store.drsagheer381.chatgpt.site/login*", "https://soleform-shoe-store.drsagheer381.chatgpt.site/reset-password", "http://localhost:4173/login*", "http://localhost:4173/reset-password"]
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+
+[functions.instagram-feed]
+verify_jwt = false
